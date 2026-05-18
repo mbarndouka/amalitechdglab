@@ -18,3 +18,8 @@ phone_min_digits = 7
 [validation_rules]
 max_income = 10000000.0
 valid_statuses = ["active", "inactive", "suspended"]
+
+[cleaning_defaults]
+placeholder_text = "[UNKNOWN]"
+default_income = 0.0
+default_status = "unknown"

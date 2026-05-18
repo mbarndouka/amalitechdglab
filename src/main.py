@@ -16,6 +16,7 @@ from profiler import (
     analyze_data_types,
     scan_anomalies,
     generate_report_string)
+from src.cleaner import execute_cleaning_pipeline, compile_cleaning_log
 
 def load_config(config_path: str = "config.toml") -> dict:
     if not os.path.exists(config_path):
@@ -39,41 +40,56 @@ def run_pipeline():
     output_dir = paths_config.get("output_dir", "reports")
     
     report_target_path = os.path.join(output_dir, "data_quality_report.txt")
+    cleaned_out_path: str = config.get("paths", {}).get("cleaned_data_output", "data/processed/customers_cleaned.csv")
     
     try:
-        raw_dataframe = load_raw_data(file_path=raw_path)
-        
-        completeness_metrics = analyze_completeness(raw_dataframe)
-        datatype_mappings    = analyze_data_types(raw_dataframe)
-        structural_anomalies = scan_anomalies(raw_dataframe, config=config)
-        
-        # Combine parameters into text template layout
-        final_report_content = generate_report_string(
-            completeness=completeness_metrics,
-            data_types=datatype_mappings,
-            anomalies=structural_anomalies
-        )
-        
-        # File I/O Side Effect isolated cleanly at finalization stage
+        raw_df = load_raw_data(file_path=raw_path)
         os.makedirs(output_dir, exist_ok=True)
-        with open(report_target_path, "w", encoding="utf-8") as file:
-            file.write(final_report_content)
+        os.makedirs(os.path.dirname(cleaned_out_path), exist_ok=True)
 
-# --- PHASE 2: Production-Grade Vectorized PII Scanning ---
-        pii_metrics: Dict[str, Any] = scan_pii_metrics(df=raw_dataframe, config=config)
-        pii_report: str = compile_pii_report(metrics=pii_metrics)
+        # --- Run Analytics Pipeline Pre-Checks ---
+        val_before = execute_validation_pipeline(df=raw_df, config=config)
+        rows_failed_before = val_before["failures_count"]
+
+        # --- PHASE 4: Execute Vectorized Data Cleaning ---
+        cleaned_df, cleaning_metrics = execute_cleaning_pipeline(df=raw_df, config=config)
+        
+        # --- Run Analytics Pipeline Post-Checks ---
+        val_after = execute_validation_pipeline(df=cleaned_df, config=config)
+        rows_failed_after = val_after["failures_count"]
+
+        # Save Cleaned Data Asset
+        cleaned_df.to_csv(cleaned_out_path, index=False)
+        logger.info(f"Cleaned dataset output written securely to disk: {cleaned_out_path}")
+
+        # Compile and write Phase 4 Logs
+        cleaning_log_content = compile_cleaning_log(
+            metrics=cleaning_metrics,
+            validation_before=rows_failed_before,
+            validation_after=rows_failed_after,
+            output_rows=len(cleaned_df)
+        )
+        with open(os.path.join(output_dir, "cleaning_log.txt"), "w", encoding="utf-8") as f:
+            f.write(cleaning_log_content)
+
+        # Regenerate standard diagnostic audit steps
+        completeness_data = analyze_completeness(raw_df)
+        datatype_mappings = analyze_data_types(raw_df)
+        structural_voids = scan_anomalies(raw_df, config=config)
+        with open(os.path.join(output_dir, "data_quality_report.txt"), "w", encoding="utf-8") as f:
+            f.write(generate_report_string(completeness_data, datatype_mappings, structural_voids))
+
+        pii_metrics = scan_pii_metrics(df=raw_df, config=config)
         with open(os.path.join(output_dir, "pii_detection_report.txt"), "w", encoding="utf-8") as f:
-            f.write(pii_report)
+            f.write(compile_pii_report(metrics=pii_metrics))
 
-        # 4. Phase 3: Vectorized Data Contract Validation
-        validation_results: Dict[str, Any] = execute_validation_pipeline(df=raw_dataframe, config=config)
-        v_report: str = compile_validation_report(results=validation_results, total_rows=len(raw_dataframe))
         with open(os.path.join(output_dir, "validation_results.txt"), "w", encoding="utf-8") as f:
-            f.write(v_report)
+            f.write(compile_validation_report(results=val_before, total_rows=len(raw_df)))
 
-        logger.info("Phases 1, 2, and 3 executed successfully.")
-        print("\n[SUCCESS] Phase 3 Data Contract Validation layer complete!")
-        print(f"Check output_reports/validation_results.txt to see the data issues captured at runtime.\n") 
+        logger.info("Phase 4 clean up routines complete.")
+        print("\n[SUCCESS] Phase 4 Clean and Normalize layer finalized successfully!")
+        print(f"Cleaned data snapshot generated at: '{cleaned_out_path}'")
+        print(f"Log diagnostics written to: '{output_dir}/cleaning_log.txt'\n")
     except Exception as err:
         logger.exception(f"Functional Pipeline processing failed: {str(err)}")
     except Exception as ex:
