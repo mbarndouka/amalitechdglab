@@ -2,6 +2,10 @@ import os
 from typing import Dict, Any, Pattern, List
 from loguru import logger
 import tomllib
+from src.validator import (
+    execute_validation_pipeline,
+    compile_validation_report
+    )
 from detector import (
     scan_pii_metrics,
     compile_pii_report
@@ -61,8 +65,15 @@ def run_pipeline():
         with open(os.path.join(output_dir, "pii_detection_report.txt"), "w", encoding="utf-8") as f:
             f.write(pii_report)
 
-        logger.info("Phase 1 & Phase 2 pipelines executed flawlessly. Vector targets secure.")
-        print("\n[SUCCESS] Production-grade Vector Pipelines complete! Verified out via uv run.") 
+        # 4. Phase 3: Vectorized Data Contract Validation
+        validation_results: Dict[str, Any] = execute_validation_pipeline(df=raw_dataframe, config=config)
+        v_report: str = compile_validation_report(results=validation_results, total_rows=len(raw_dataframe))
+        with open(os.path.join(output_dir, "validation_results.txt"), "w", encoding="utf-8") as f:
+            f.write(v_report)
+
+        logger.info("Phases 1, 2, and 3 executed successfully.")
+        print("\n[SUCCESS] Phase 3 Data Contract Validation layer complete!")
+        print(f"Check output_reports/validation_results.txt to see the data issues captured at runtime.\n") 
     except Exception as err:
         logger.exception(f"Functional Pipeline processing failed: {str(err)}")
     except Exception as ex:

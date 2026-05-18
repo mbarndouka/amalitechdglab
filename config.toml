@@ -14,3 +14,7 @@ email = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
 [pii_settings]
 target_columns = ["first_name", "last_name", "email", "phone", "date_of_birth", "address"]
 phone_min_digits = 7
+
+[validation_rules]
+max_income = 10000000.0
+valid_statuses = ["active", "inactive", "suspended"]
