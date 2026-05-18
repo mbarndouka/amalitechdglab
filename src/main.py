@@ -1,5 +1,7 @@
 import os 
+import sys
 from loguru import logger
+import tomllib
 from profiler import (
     load_raw_data,
     analyze_completeness, 
@@ -7,11 +9,26 @@ from profiler import (
     scan_anomalies,
     generate_report_string)
 
+def load_config(config_path: str = "config.toml") -> dict:
+    if not os.path.exists(config_path):
+        logger.warning(f"Config file {config_path} not found. Using defaults.")
+        return {}
+    try:
+        with open(config_path, "rb") as f:
+            return tomllib.load(f)
+    except Exception as e:
+        logger.error(f"Failed to load config: {e}")
+        return {}
+
 def run_pipeline():
     logger.add("logs/pipeline_run.log", rotation="10 MB", level="INFO")
     logger.info("Executing Phase 1 Pure Functional Data Profiler...")
-    raw_path = "data/raw/customers_raw.csv"
-    output_dir = "reports"
+    
+    config = load_config()
+    paths_config = config.get("paths", {})
+    
+    raw_path = paths_config.get("raw_data_path", "data/raw/customers_raw.csv")
+    output_dir = paths_config.get("output_dir", "reports")
     
     report_target_path = os.path.join(output_dir, "data_quality_report.txt")
     
@@ -20,7 +37,7 @@ def run_pipeline():
         
         completeness_metrics = analyze_completeness(raw_dataframe)
         datatype_mappings    = analyze_data_types(raw_dataframe)
-        structural_anomalies = scan_anomalies(raw_dataframe)
+        structural_anomalies = scan_anomalies(raw_dataframe, config=config)
         
         # Combine parameters into text template layout
         final_report_content = generate_report_string(

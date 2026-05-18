@@ -1,6 +1,6 @@
 [paths]
 raw_data_path = "data/raw/customers_raw.csv"
-output_dir = "output_reports"
+output_dir = "reports"
 cleaned_data_output = "data/processed/customers_cleaned.csv"
 
 [validation_rules]

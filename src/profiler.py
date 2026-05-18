@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 from loguru import logger
+from typing import Dict, Any, List
 
 def load_raw_data(file_path: str) -> pd.DataFrame:
     if not os.path.exists(file_path):
@@ -15,23 +16,25 @@ def load_raw_data(file_path: str) -> pd.DataFrame:
         logger.error(f"Error loading data from {file_path}: {e}")
         raise
     
-def analyze_completeness(df:pd.DataFrame) -> dict:
+def analyze_completeness(df: pd.DataFrame) -> Dict[str, Dict[str, Any]]:
     total_rows = len(df)
     if total_rows == 0:
         logger.warning("No data to analyze.")
-        return{}
-    return{
-        col:{
+        return {}
+    return {
+        col: {
             "percentage": ((total_rows - int(df[col].isna().sum())) / total_rows) * 100,
             "missing_count": int(df[col].isna().sum())
         }
         for col in df.columns
     }
     
-def analyze_data_types(df: pd.DataFrame) -> dict:
+def analyze_data_types(df: pd.DataFrame) -> Dict[str, str]:
     return {col: str(dtype).upper() for col, dtype in df.dtypes.items()}
 
-def scan_anomalies(df: pd.DataFrame) -> dict:
+def scan_anomalies(df: pd.DataFrame, config: Dict[str, Any] = None) -> Dict[str, List[str]]:
+    valid_statuses = config.get('validation_rules', {}).get('valid_statuses', ['active', 'inactive', 'suspended']) if config else ['active', 'inactive', 'suspended']
+    
     issues = {
         "uniqueness_failures": [],
         "date_format_anomalies": [],
@@ -39,35 +42,50 @@ def scan_anomalies(df: pd.DataFrame) -> dict:
         "status_anomalies": []
     }
     
+    # 1. Vectorized Uniqueness Check
     if not df['customer_id'].is_unique:
-        duplicates = df['customer_id'][df['customer_id'].duplicated(keep=False)].tolist()
+        duplicates = df.loc[df['customer_id'].duplicated(keep=False), 'customer_id'].tolist()
         issues["uniqueness_failures"].append(f"customer_id has duplicates: {duplicates}")
         
-    for idx, row in df.iterrows():
-        row_num = idx + 1
-        
-        for date_col in ['date_of_birth', 'created_date']:
-            val = str(row[date_col]).strip()
-            if 'invalid_date' in val.lower() or '/' in val or '.' in val:
-                issues["date_format_anomalies"].append(f"Row {row_num}: {date_col} Non-standard string.'{val}'")
-                
-            try:
-                income_val = float(row['income'])
-                if income_val < 0:
-                    issues["income_anomalies"].append(f"Row {row_num}: Negative income value '{income_val}'")
-            except (ValueError, TypeError):
-                if pd.isna(row['income']):
-                    issues["income_anomalies"].append(f"Row {row_num}: Empty valuation cell")
-                    
-            status = str(row['account_status']).strip()
-            if pd.isna(row['account_status']):
-                issues["status_anomalies"].append(f"Row {row_num}: Account status cell is null")
-            elif status not in ['active', 'inactive', 'suspended']:
-                issues["status_anomalies"].append(f"Row {row_num}: Invalid categorical status token '{status}'")
+    # 2. Vectorized Date Checks
+    for date_col in ['date_of_birth', 'created_date']:
+        if date_col in df.columns:
+            # Check for generic invalid strings or slash/dot formats
+            mask_invalid_string = df[date_col].astype(str).str.lower().str.contains('invalid_date', na=False)
+            mask_slash_dot = df[date_col].astype(str).str.contains(r'[/.]', regex=True, na=False)
+            invalid_dates_idx = df[mask_invalid_string | mask_slash_dot].index
+            for idx in invalid_dates_idx:
+                issues["date_format_anomalies"].append(f"Row {idx + 1}: {date_col} Non-standard string.'{df.at[idx, date_col]}'")
+
+    # 3. Vectorized Income Checks
+    if 'income' in df.columns:
+        # Check negative incomes
+        numeric_incomes = pd.to_numeric(df['income'], errors='coerce')
+        negative_idx = df[numeric_incomes < 0].index
+        for idx in negative_idx:
+            issues["income_anomalies"].append(f"Row {idx + 1}: Negative income value '{df.at[idx, 'income']}'")
+            
+        # Check non-numeric/empty values that were originally not empty but failed numeric conversion
+        # Empty cells
+        empty_income_idx = df[df['income'].isna()].index
+        for idx in empty_income_idx:
+            issues["income_anomalies"].append(f"Row {idx + 1}: Empty valuation cell")
+
+    # 4. Vectorized Status Checks
+    if 'account_status' in df.columns:
+        empty_status_idx = df[df['account_status'].isna()].index
+        for idx in empty_status_idx:
+            issues["status_anomalies"].append(f"Row {idx + 1}: Account status cell is null")
+            
+        status_clean = df['account_status'].astype(str).str.strip().str.lower()
+        invalid_status_mask = ~status_clean.isin(valid_statuses) & df['account_status'].notna()
+        invalid_status_idx = df[invalid_status_mask].index
+        for idx in invalid_status_idx:
+            issues["status_anomalies"].append(f"Row {idx + 1}: Invalid categorical status token '{df.at[idx, 'account_status']}'")
                 
     return issues
     
-def generate_report_string(completeness: dict, data_types: dict, anomalies: dict) -> str:
+def generate_report_string(completeness: Dict[str, Dict[str, Any]], data_types: Dict[str, str], anomalies: Dict[str, List[str]]) -> str:
     """Pure function focusing solely on text layout generation.
 
     Takes computed measurements and compiles them into the final text layout.
