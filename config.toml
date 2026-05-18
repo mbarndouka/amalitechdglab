@@ -1,0 +1,12 @@
+[paths]
+raw_data_path = "data/raw/customers_raw.csv"
+output_dir = "output_reports"
+cleaned_data_output = "data/processed/customers_cleaned.csv"
+
+[validation_rules]
+max_income = 10000000
+valid_statuses = ["active", "inactive", "suspended"]
+
+[regex_patterns]
+email = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+phone_generic = '\d'

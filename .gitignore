@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Data files (ignore contents but keep folders if needed)
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# Generated Reports & Logs
+reports/*
+!reports/.gitkeep
+logs/
+*.log
+
+# Environments & Dependency Management
+.env
+.venv
+env/
+venv/
+.cache/
+.uv/
+
+# Build & Packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE & OS Specific
+.vscode/
+.idea/
+.DS_Store
+*.swp
