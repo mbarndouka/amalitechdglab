@@ -59,7 +59,17 @@ def build_schema_contract(config: Dict[str, Any]) -> pa.DataFrameSchema:
     )
 
 def execute_validation_pipeline(df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
-    """Validates the dataframe and implements Quarantine / Dead Letter Queue routing."""
+    """
+    Validates a DataFrame against a predefined Pandera schema contract.
+    
+    Args:
+        df (pd.DataFrame): The dataset to validate.
+        config (Dict[str, Any]): The configuration dictionary (from config.toml) detailing rules.
+
+    Returns:
+        dict: A dictionary containing the validation summary, including
+              'failures_count', 'status', and detailed error case dataframes.
+    """
     schema: pa.DataFrameSchema = build_schema_contract(config)
     
     try:
@@ -89,6 +99,16 @@ def execute_validation_pipeline(df: pd.DataFrame, config: Dict[str, Any]) -> Dic
         }
 
 def compile_validation_report(results: Dict[str, Any], total_rows: int) -> str:
+    """
+    Compiles raw validation dictionaries into a human-readable text report.
+    
+    Args:
+        results (dict): The output dictionary from execute_validation_pipeline.
+        total_rows (int): The total number of rows processed.
+
+    Returns:
+        str: A formatted string block ready to be written to a .txt report file.
+    """
     lines: List[str] = [
         "VALIDATION RESULTS",
         "==================",

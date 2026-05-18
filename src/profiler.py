@@ -4,6 +4,18 @@ from loguru import logger
 from typing import Dict, Any, List
 
 def load_raw_data(file_path: str) -> pd.DataFrame:
+    """
+    Safely loads the target dataset from disk into memory.
+    
+    Args:
+        file_path (str): The absolute or relative path to the CSV file.
+
+    Returns:
+        pd.DataFrame: The loaded dataset.
+        
+    Raises:
+        FileNotFoundError: If the specified file_path does not exist.
+    """
     if not os.path.exists(file_path):
         logger.error(f"File not found: {file_path}")
         raise FileNotFoundError(f"File not found: {file_path}")

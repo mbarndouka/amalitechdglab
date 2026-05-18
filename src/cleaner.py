@@ -54,14 +54,20 @@ def normalize_date_vector(date_series: pd.Series) -> Tuple[pd.Series, int]:
     return cleaned_dates, modified_count
 
 def execute_cleaning_pipeline(df: pd.DataFrame, config: Dict[str, Any]) -> Tuple[pd.DataFrame, Dict[str, Any]]:
-    """Pure functional cleaning pipeline processing vector mutations simultaneously.
-
+    """
+    Executes vectorized transformations to clean and standardize the DataFrame.
+    
+    Operations include filling missing names, standardizing phone numbers,
+    coercing invalid dates, and normalizing string casing.
+    
     Args:
-        df: The immutable raw input dataframe.
-        config: Centralized application configuration settings.
+        df (pd.DataFrame): The raw dataframe to clean.
+        config (dict): Configuration mappings for imputation and formatting.
 
     Returns:
-        A tuple containing the transformed clean DataFrame and a metric dictionary log.
+        tuple: A tuple containing:
+            - pd.DataFrame: The newly cleaned DataFrame.
+            - dict: A metrics dictionary logging how many rows were mutated per column.
     """
     cleaned_df = df.copy()
     defaults = config.get("cleaning_defaults", {})

@@ -12,6 +12,15 @@ from src.cleaner import execute_cleaning_pipeline, compile_cleaning_log
 from src.masker import execute_masking_pipeline, compile_masked_sample_log
 
 def load_pipeline_config(config_path: str = "config.toml") -> dict:
+    """
+    Safely loads the Toml configuration matrix into memory.
+    
+    Args:
+        config_path (str): The string path to the project configuration file.
+    
+    Returns:
+        dict: The mapped configurations dict, or an empty dict if the file parsing fails.
+    """
     if not os.path.exists(config_path):
         logger.warning(f"Config file {config_path} not found. Using defaults.")
         return {}
@@ -91,7 +100,20 @@ def compile_pipeline_execution_report(
     return "\n".join(lines)
 
 def run_orchestrator() -> None:
-    """The central orchestration entry point managing data flow pipelines and side-effect I/O tasks."""
+    """
+    Master controller function that executes the end-to-end data pipeline.
+    
+    This workflow orchestrates the following phases in sequence:
+    1. Load: Reads raw CSV data into a DataFrame.
+    2. Clean: Standardizes formats and imputes missing values.
+    3. Validate: Enforces schema contracts using Pandera.
+    4. Detect: Scans for PII exposures via regex boundaries.
+    5. Mask: Obscures PII elements to ensure GDPR compliance.
+    6. Save: Writes artifacts and diagnostic reports to disk.
+    
+    Returns:
+        None
+    """
     # 1. Initialize production-grade logging parameters
     logger.remove()
     logger.add("logs/pipeline_run.log", rotation="10 MB", level="INFO", format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {message}")

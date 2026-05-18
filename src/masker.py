@@ -67,13 +67,17 @@ def mask_dob_series(series: pd.Series) -> pd.Series:
     return masked_series
 
 def execute_masking_pipeline(df: pd.DataFrame) -> pd.DataFrame:
-    """Pure functional masking pipeline protecting PII vectors at memory scale.
-
+    """
+    Secures Personally Identifiable Information (PII) through structural masking.
+    
+    Transforms sensitive text into safe representations (e.g., 'j***@gmail.com')
+    to balance data security with analytical utility.
+    
     Args:
-        df: The normalized clean dataframe asset.
+        df (pd.DataFrame): The cleaned DataFrame containing clear-text PII.
 
     Returns:
-        An isolated, fully obfuscated copy of the dataframe.
+        pd.DataFrame: A new DataFrame with all PII targets successfully masked.
     """
     masked_df = df.copy()
     
