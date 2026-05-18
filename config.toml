@@ -7,6 +7,10 @@ cleaned_data_output = "data/processed/customers_cleaned.csv"
 max_income = 10000000
 valid_statuses = ["active", "inactive", "suspended"]
 
+# Configuration Schema Representation (config.toml)
 [regex_patterns]
 email = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-phone_generic = '\d'
+
+[pii_settings]
+target_columns = ["first_name", "last_name", "email", "phone", "date_of_birth", "address"]
+phone_min_digits = 7

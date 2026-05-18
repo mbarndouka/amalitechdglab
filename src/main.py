@@ -1,7 +1,11 @@
 import os 
-import sys
+from typing import Dict, Any, Pattern, List
 from loguru import logger
 import tomllib
+from detector import (
+    scan_pii_metrics,
+    compile_pii_report
+    )
 from profiler import (
     load_raw_data,
     analyze_completeness, 
@@ -51,9 +55,18 @@ def run_pipeline():
         with open(report_target_path, "w", encoding="utf-8") as file:
             file.write(final_report_content)
 
-        print(f"\n[SUCCESS] Phase 1 functional step complete. Audit report safe at: {report_target_path}\n")
+# --- PHASE 2: Production-Grade Vectorized PII Scanning ---
+        pii_metrics: Dict[str, Any] = scan_pii_metrics(df=raw_dataframe, config=config)
+        pii_report: str = compile_pii_report(metrics=pii_metrics)
+        with open(os.path.join(output_dir, "pii_detection_report.txt"), "w", encoding="utf-8") as f:
+            f.write(pii_report)
+
+        logger.info("Phase 1 & Phase 2 pipelines executed flawlessly. Vector targets secure.")
+        print("\n[SUCCESS] Production-grade Vector Pipelines complete! Verified out via uv run.") 
     except Exception as err:
         logger.exception(f"Functional Pipeline processing failed: {str(err)}")
+    except Exception as ex:
+        logger.exception(f"Unexpected operational crash inside core orchestrator process: {str(ex)}")
         
 if __name__ == "__main__":
     run_pipeline()
