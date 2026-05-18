@@ -2,6 +2,7 @@
 raw_data_path = "data/raw/customers_raw.csv"
 output_dir = "reports"
 cleaned_data_output = "data/processed/customers_cleaned.csv"
+masked_data_output = "data/processed/customers_masked.csv"
 
 [validation_rules]
 max_income = 10000000
