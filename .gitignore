@@ -10,7 +10,6 @@ data/processed/*
 !data/processed/.gitkeep
 
 # Generated Reports & Logs
-reports/*
 !reports/.gitkeep
 logs/
 *.log

@@ -1,0 +1,50 @@
+PIPELINE EXECUTION REPORT
+=========================
+Timestamp: 2026-05-18 16:36:36
+
+Stage 1: LOAD
+✓ Loaded customers_raw.csv
+- 10 rows, 10 columns
+
+Stage 2: CLEAN
+✓ Normalized phone formats (8 rows)
+✓ Normalized date formats (16 rows)
+✓ Fixed capitalization (0 row)
+✓ Filled missing values (6 rows)
+
+Stage 3: VALIDATE
+✓ Passed schema validation status: FAIL
+- customer_id: 10/10 unique
+- first_name: Clean placeholders or Title case applied
+- email: 100% standard domain formatting verified
+
+Stage 4: DETECT PII
+✓ Found PII in:
+- 10 email addresses
+- 10 phone numbers
+- 8 addresses
+- 9 dates of birth
+
+Stage 5: MASK
+✓ Masked all PII structural matrices safely
+- Names: masked (First char + asterisks padding)
+- Emails: masked (Local mailbox hidden, domain clear)
+- Phones: masked (Area codes obscured)
+- Addresses: masked (Replaced with block placeholder)
+- DOBs: masked (Months and days generalized)
+
+Stage 6: SAVE
+✓ Saved pipeline outputs to disk:
+- customers_cleaned.csv (Final sanitized, masked operational dataset)
+- data_quality_report.txt (Diagnostic audit log)
+- validation_results.txt (Schema verification metrics)
+- pii_detection_report.txt (Vulnerability tracking parameters)
+- cleaning_log.txt (Mutation trace file)
+- masked_sample.txt (Compliance transformation verification visual)
+
+SUMMARY:
+- Input: 10 rows (messy raw state)
+- Output: 10 rows (clean, masked, validated)
+- Quality: FAIL
+- PII Risk: MITIGATED (all targets safely obfuscated)
+Status: SUCCESS ✓

@@ -1,0 +1,34 @@
+VALIDATION RESULTS
+==================
+
+PASS: [1 rows passed all checks]
+FAIL: [9 rows failed]
+
+FAILURES BY COLUMN:
+-------------------
+account_status:
+- Row 2: ' active' (failed check: isin(['active', 'inactive', 'suspended']))
+- Row 10: ' active' (failed check: isin(['active', 'inactive', 'suspended']))
+- Row 9: ' active' (failed check: isin(['active', 'inactive', 'suspended']))
+- Row 8: ' inactive' (failed check: isin(['active', 'inactive', 'suspended']))
+- Row 7: ' active' (failed check: isin(['active', 'inactive', 'suspended']))
+- Row 6: ' active' (failed check: isin(['active', 'inactive', 'suspended']))
+- Row 5: ' active' (failed check: isin(['active', 'inactive', 'suspended']))
+- Row 3: ' suspended' (failed check: isin(['active', 'inactive', 'suspended']))
+- Row 1: ' active' (failed check: isin(['active', 'inactive', 'suspended']))
+
+created_date:
+- Row 10: ' invalid_date' (invalid date value)
+
+date_of_birth:
+- Row 6: ' invalid_date' (invalid date value)
+
+email:
+- Row 1: ' john.doe@gmail.com' (failed check: str_matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'))
+- Row 3: ' bob.johnson@email.com' (failed check: str_matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'))
+- Row 10: ' jennifer.taylor@company.net' (failed check: str_matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'))
+- Row 9: ' david_moore@hotmail.com' (failed check: str_matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'))
+- Row 8: ' sarah.wilson@gmail.com' (failed check: str_matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'))
+- Row 7: ' michael.miller@work.com' (failed check: str_matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'))
+- Row 6: ' PATRICIA.DAVIS@GMAIL.COM' (failed check: str_matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'))
+- Row 5: ' robert.wilson@yahoo.com' (failed check: str_matches('^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'))

@@ -1,0 +1,42 @@
+DATA QUALITY PROFILE REPORT
+===========================
+
+COMPLETENESS:
+- customer_id: 100% (0 missing)
+- first_name: 90% (1 missing)
+- last_name: 90% (1 missing)
+- email: 100% (0 missing)
+- phone: 100% (0 missing)
+- date_of_birth: 100% (0 missing)
+- address: 80% (2 missing)
+- income: 90% (1 missing)
+- account_status: 90% (1 missing)
+- created_date: 100% (0 missing)
+
+DATA TYPES:
+- customer_id: INT64 ✓
+- first_name: STR ✓
+- last_name: STR ✓
+- email: STR ✓
+- phone: STR ✓
+- date_of_birth: STR ✓
+- address: STR ✓
+- income: FLOAT64 ✓
+- account_status: STR ✓
+- created_date: STR ✓
+
+QUALITY ISSUES:
+1. Date Format Anomalies:
+   - Row 4: date_of_birth Non-standard string.'1975/05/10'
+   - Row 6: date_of_birth Non-standard string.' invalid_date'
+   - Row 5: created_date Non-standard string.' 01/15/2024'
+   - Row 10: created_date Non-standard string.' invalid_date'
+2. Income Anomalies:
+   - Row 3: Empty valuation cell
+3. Status Anomalies:
+   - Row 4: Account status cell is null
+
+SEVERITY:
+- Critical (blocks processing): 0
+- High (data incorrect): 2
+- Medium (needs cleaning): 4
