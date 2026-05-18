@@ -1,18 +1,25 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 import os
 import pandas as pd
 import pandera as pa
 from loguru import logger
 
+# --- 1. Custom Validation Extensions ---
+@pa.extensions.register_check_method
+def is_valid_date_format(pandas_obj: pd.Series) -> pd.Series:
+    """Vectorized custom check for invalid date strings."""
+    return ~pandas_obj.astype(str).str.lower().str.contains("invalid")
+
+# --- 2. Centralized Error Reason Mappings ---
+ERROR_MAPPINGS = {
+    "first_name_str_matches": "should be title case after cleaning/only alphabet characters",
+    "date_of_birth_is_valid_date_format": "invalid date value",
+    "created_date_is_valid_date_format": "invalid date value",
+    "account_status_isin": "should be one of: active, inactive, suspended",
+}
+
+
 def build_schema_contract(config: Dict[str, Any]) -> pa.DataFrameSchema:
-    """Factory function that builds a Pandera validation schema based on config settings.
-
-    Args:
-        config: The decoupled master application configuration dictionary.
-
-    Returns:
-        A compiled, executable Pandera DataFrameSchema contract.
-    """
     rules: Dict[str, Any] = config.get("validation_rules", {})
     regex_rules: Dict[str, Any] = config.get("regex_patterns", {})
     
@@ -26,14 +33,14 @@ def build_schema_contract(config: Dict[str, Any]) -> pa.DataFrameSchema:
             "first_name": pa.Column(pa.String, checks=[
                 pa.Check.str_length(min_value=2, max_value=50),
                 pa.Check.str_matches(r"^[A-Za-z\s]+$")
-            ], nullable=True), # Set to True because row 3 is missing first name
+            ], nullable=True),
             "last_name": pa.Column(pa.String, checks=[
                 pa.Check.str_length(min_value=2, max_value=50)
-            ], nullable=True), # Set to True because row 5 is missing last name
+            ], nullable=True),
             "email": pa.Column(pa.String, checks=[pa.Check.str_matches(email_regex)], nullable=False),
             "phone": pa.Column(pa.String, nullable=False),
             "date_of_birth": pa.Column(pa.String, checks=[
-                pa.Check(lambda s: ~s.str.lower().str.contains("invalid"), name="valid_date_string")
+                pa.Check.is_valid_date_format()
             ], nullable=False),
             "address": pa.Column(pa.String, nullable=True),
             "income": pa.Column(pa.Float, checks=[
@@ -44,48 +51,44 @@ def build_schema_contract(config: Dict[str, Any]) -> pa.DataFrameSchema:
                 pa.Check.isin(valid_statuses)
             ], nullable=True),
             "created_date": pa.Column(pa.String, checks=[
-                pa.Check(lambda s: ~s.str.lower().str.contains("invalid"), name="valid_created_date")
+                pa.Check.is_valid_date_format()
             ], nullable=False)
         },
-        coerce=True,       # Automatically safely cast matching structural formats
-        strict=True        # Drop processing if unexpected columns are injected
+        coerce=True,
+        strict=True
     )
 
 def execute_validation_pipeline(df: pd.DataFrame, config: Dict[str, Any]) -> Dict[str, Any]:
-    """Validates the input DataFrame against the contract without row loops.
-
-    Args:
-        df: The raw ingested dataframe.
-        config: Centralized application configuration settings.
-
-    Returns:
-        A dictionary containing clean metadata summaries of schema failures.
-    """
+    """Validates the dataframe and implements Quarantine / Dead Letter Queue routing."""
     schema: pa.DataFrameSchema = build_schema_contract(config)
     
     try:
-        # Pandera validates everything at vector execution speed
-        schema.validate(df, lazy=True)
-        return {"status": "PASS", "failures_count": 0, "failure_cases": pd.DataFrame()}
+        clean_df = schema.validate(df, lazy=True)
+        return {
+            "status": "PASS", 
+            "failures_count": 0, 
+            "clean_data": clean_df,
+            "quarantine_data": pd.DataFrame(),
+            "failure_cases": pd.DataFrame()
+        }
     except pa.errors.SchemaErrors as err:
-        logger.warning(f"Data validation failed contract thresholds. Captured {len(err.failure_cases)} error cases.")
-        # err.failure_cases contains a structured breakdown of every single row, column, and failed check
+        failure_cases = err.failure_cases
+        logger.warning(f"Data validation failed contract thresholds. Captured {len(failure_cases)} error cases.")
+        
+        # --- 3. Quarantine Pattern ---
+        bad_indices = failure_cases["index"].dropna().unique()
+        clean_df = df[~df.index.isin(bad_indices)]
+        quarantine_df = df[df.index.isin(bad_indices)]
+        
         return {
             "status": "FAIL",
-            "failures_count": len(err.failure_cases),
-            "failure_cases": err.failure_cases
+            "failures_count": len(failure_cases),
+            "clean_data": clean_df,
+            "quarantine_data": quarantine_df,
+            "failure_cases": failure_cases
         }
 
 def compile_validation_report(results: Dict[str, Any], total_rows: int) -> str:
-    """Compiles the captured matrix failures into the requested validation_results.txt layout.
-
-    Args:
-        results: Dictionary summary generated by execute_validation_pipeline.
-        total_rows: Total raw record tracking count.
-
-    Returns:
-        A formatted report string detailing data quality compliance.
-    """
     lines: List[str] = [
         "VALIDATION RESULTS",
         "==================",
@@ -99,7 +102,7 @@ def compile_validation_report(results: Dict[str, Any], total_rows: int) -> str:
     
     failure_df: pd.DataFrame = results["failure_cases"]
     
-    # Calculate failed rows safely by dropping NA indices
+    # Calculate failed rows safely
     valid_indices = failure_df["index"].dropna()
     failed_count = len(valid_indices.unique())
     passed_count = total_rows - failed_count
@@ -109,49 +112,37 @@ def compile_validation_report(results: Dict[str, Any], total_rows: int) -> str:
     lines.append("FAILURES BY COLUMN:")
     lines.append("-------------------")
     
-    # Extract unique failed column targets using vectorized groups
     if "column" in failure_df.columns:
         for col, group in failure_df.groupby("column", dropna=True):
             if pd.isna(col): continue
             lines.append(f"{col}:")
             for _, row_fail in group.iterrows():
-                # Correct row numbers for human readability (index + 1)
                 human_row = int(row_fail['index']) + 1 if pd.notna(row_fail['index']) else "Global"
                 
                 val = row_fail['failure_case']
                 check_name = str(row_fail['check'])
                 
-                # Format empty/null values
-                if pd.isna(val) or val == "":
-                    display_val = "Empty"
-                else:
-                    display_val = f"'{val}'"
-                    
-                # Format reason descriptions
-                reason = "invalid value"
+                # Handling display format
+                display_val = "Empty" if pd.isna(val) or val == "" else f"'{val}'"
+                
+                # --- 4. Strategy Lookup Pattern (Eliminates the giant if/elif block) ---
+                mapping_key = f"{col}_{check_name}"
+                
                 if "not_nullable" in check_name or "pd.notna" in check_name:
                     reason = "should be non-empty"
-                elif col == "first_name" and "str_matches" in check_name:
-                    display_val = f"'{val}'"
-                    reason = "should be title case after cleaning/only alphabet characters"
-                elif col == "date_of_birth" and "valid_date_string" in check_name:
-                    reason = "invalid date value"
-                elif col == "date_of_birth":
-                    reason = "wrong format, should be YYYY-MM-DD"
-                elif col == "account_status" and "isin" in check_name:
-                    if display_val == "Empty":
-                        reason = "should be one of: active, inactive, suspended"
-                    else:
-                        reason = "invalid value"
-                elif col == "phone":
-                    if display_val != "Empty" and "." in str(val):
+                elif col == "phone" and display_val != "Empty":
+                    if "." in str(val):
                         reason = "non-standard format, should be XXX-XXX-XXXX"
-                    elif display_val != "Empty" and "-" not in str(val):
+                    elif "-" not in str(val):
                         reason = "no formatting"
                     else:
                         reason = "invalid format"
+                elif col == "date_of_birth" and check_name not in ["is_valid_date_format"]:
+                    reason = "wrong format, should be YYYY-MM-DD"
                 else:
-                    reason = f"failed check: {check_name}"
+                    reason = ERROR_MAPPINGS.get(mapping_key, f"failed check: {check_name}")
+                    if display_val == "Empty" and mapping_key == "account_status_isin":
+                        reason = "should be one of: active, inactive, suspended"
                     
                 lines.append(f"- Row {human_row}: {display_val} ({reason})")
             lines.append("")
